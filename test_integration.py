@@ -49,7 +49,7 @@ def test_integration():
                     print(f"   - {entry['item_name']} missing in {entry['mode']}")
         
         # Test other modes
-        modes_to_test = ["Daily Essentials", "Gym", "Trip"]
+        modes_to_test = ["Daily", "Gym", "Trip"]
         for mode in modes_to_test:
             response = requests.get(f"http://localhost:8000/scan?mode={mode}")
             if response.status_code == 200:

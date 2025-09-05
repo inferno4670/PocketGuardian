@@ -1,28 +1,28 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import random
 
 # Initialize FastAPI app
 app = FastAPI(title="Pocket Guardian API", description="Backend API for Pocket Guardian item scanning app")
 
-# Configure CORS
+# Configure CORS support for React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
 # In-memory storage for history
 history_storage: List[Dict[str, Any]] = []
 
-# Mode configurations
+# Mode configurations with example mock data
 MODES = {
-    "Daily Essentials": ["Wallet", "Keys"],
+    "Daily": ["Wallet", "Keys"],
     "College": ["Wallet", "ID", "Earbuds"],
     "Gym": ["Wallet", "Bottle", "Towel"],
     "Trip": ["Wallet", "Charger", "Powerbank"]
@@ -67,10 +67,9 @@ async def root():
     return {"message": "Pocket Guardian FastAPI Backend", "version": "1.0.0"}
 
 @app.get("/scan")
-async def scan_items(mode: str = "Daily Essentials"):
+async def scan_items(mode: str = Query("Daily", description="Scanning mode: College, Gym, Trip, or Daily")):
     """
-    Simulate scanning items for a given mode
-    Returns JSON with list of items and their detection status
+    GET /scan accepts query parameter 'mode' and returns JSON with required items and random status
     """
     try:
         items = simulate_scan(mode)
@@ -97,8 +96,7 @@ async def scan_items(mode: str = "Daily Essentials"):
 @app.get("/history")
 async def get_history():
     """
-    Get all past missing events with timestamps
-    Returns JSON list of historical missing item events
+    GET /history returns list of past missing events with timestamp and mode
     """
     # Sort by timestamp (most recent first)
     sorted_history = sorted(history_storage, key=lambda x: x["timestamp"], reverse=True)
@@ -107,8 +105,7 @@ async def get_history():
 @app.post("/history")
 async def add_history_item(history_item: HistoryItem):
     """
-    Add a missing item event to history
-    Accepts item name, mode, and timestamp
+    POST /history accepts item name, mode, timestamp and stores in memory
     """
     try:
         new_entry = {

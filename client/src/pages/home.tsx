@@ -7,7 +7,7 @@ import { AlertModal } from "@/components/alert-modal";
 import type { ItemStatus } from "@shared/schema";
 
 export default function Home() {
-  const [currentMode, setCurrentMode] = useState("Daily Essentials");
+  const [currentMode, setCurrentMode] = useState("Daily");
   const [items, setItems] = useState<ItemStatus[]>([]);
   const [alertState, setAlertState] = useState<{
     isVisible: boolean;

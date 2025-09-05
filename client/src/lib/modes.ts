@@ -7,8 +7,8 @@ export interface ModeConfig {
 }
 
 export const modes: Record<string, ModeConfig> = {
-  "Daily Essentials": {
-    name: "Daily Essentials",
+  "Daily": {
+    name: "Daily",
     items: [
       { name: "Wallet", icon: "fas fa-wallet" },
       { name: "Keys", icon: "fas fa-key" }
