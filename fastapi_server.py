@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -13,7 +13,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -29,6 +29,10 @@ MODES = {
 }
 
 # Pydantic models
+class ScanRequest(BaseModel):
+    mode: str
+    custom_items: Optional[List[str]] = None
+
 class ScanResponse(BaseModel):
     mode: str
     items: List[Dict[str, str]]
@@ -45,13 +49,16 @@ class HistoryEntry(BaseModel):
     timestamp: str
     status: str
 
-def simulate_scan(mode: str) -> List[Dict[str, str]]:
+def simulate_scan(mode: str, custom_items: Optional[List[str]] = None) -> List[Dict[str, str]]:
     """Simulate BLE/NFC scan with random mock values"""
-    if mode not in MODES:
-        raise HTTPException(status_code=400, detail=f"Unknown mode: {mode}")
+    # Use custom items if provided, otherwise fall back to default mode items
+    items_to_scan = custom_items if custom_items else MODES.get(mode, [])
+    
+    if not items_to_scan:
+        raise HTTPException(status_code=400, detail=f"No items found for mode: {mode}")
     
     items = []
-    for item_name in MODES[mode]:
+    for item_name in items_to_scan:
         # 70% chance of detection (simulate real-world scanning)
         status = "detected" if random.random() > 0.3 else "missing"
         items.append({
@@ -67,28 +74,25 @@ async def root():
     return {"message": "Pocket Guardian FastAPI Backend", "version": "1.0.0"}
 
 @app.get("/scan")
-async def scan_items(mode: str = Query("Daily", description="Scanning mode: College, Gym, Trip, or Daily")):
+async def scan_items_get(mode: str = Query("Daily", description="Scanning mode: College, Gym, Trip, or Daily")):
     """
     GET /scan accepts query parameter 'mode' and returns JSON with required items and random status
     """
     try:
         items = simulate_scan(mode)
-        
-        # Store missing items in history
-        missing_items = [item for item in items if item["status"] == "missing"]
-        current_time = datetime.now().isoformat()
-        
-        for item in missing_items:
-            history_entry = {
-                "id": len(history_storage) + 1,
-                "item_name": item["name"],
-                "mode": mode,
-                "timestamp": current_time,
-                "status": "missing"
-            }
-            history_storage.append(history_entry)
-        
         return ScanResponse(mode=mode, items=items)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
+
+@app.post("/scan")
+async def scan_items_post(scan_request: ScanRequest):
+    """
+    POST /scan accepts mode and optional custom_items list, returns JSON with scan results
+    """
+    try:
+        items = simulate_scan(scan_request.mode, scan_request.custom_items)
+        return ScanResponse(mode=scan_request.mode, items=items)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")

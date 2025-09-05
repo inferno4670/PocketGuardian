@@ -23,13 +23,32 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
       const defaultItems = modeConfig.map(item => item.name);
       const currentItems = getItemsForMode(mode, defaultItems);
       
-      // Simulate scanning these items (since we're using custom items)
-      const items: ItemStatus[] = currentItems.map(itemName => ({
-        name: itemName,
-        detected: Math.random() > 0.3 // 70% chance of detection
-      }));
-      
-      return items;
+      try {
+        // Try to use FastAPI backend first
+        const response = await apiRequest("POST", "/scan", {
+          mode: mode,
+          custom_items: currentItems
+        });
+        const result = await response.json();
+        
+        // Transform FastAPI response to expected format
+        const items: ItemStatus[] = result.items.map((item: any) => ({
+          name: item.name,
+          detected: item.status === "detected"
+        }));
+        
+        return items;
+      } catch (error) {
+        console.warn("FastAPI backend not available, using local simulation:", error);
+        
+        // Fallback to local simulation if FastAPI is not available
+        const items: ItemStatus[] = currentItems.map(itemName => ({
+          name: itemName,
+          detected: Math.random() > 0.3 // 70% chance of detection
+        }));
+        
+        return items;
+      }
     },
     onSuccess: (items) => {
       const missingItems = items.filter(item => !item.detected).map(item => item.name);
