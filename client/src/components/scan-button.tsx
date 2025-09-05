@@ -1,14 +1,13 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { ScanRequest, ScanResponse } from "@shared/schema";
+import type { FastApiScanResponse, FastApiItemStatus, ItemStatus } from "@shared/schema";
 
 interface ScanButtonProps {
   mode: string;
-  onScanComplete: (result: ScanResponse) => void;
+  onScanComplete: (result: { items: ItemStatus[], allDetected: boolean, missingItems: string[] }) => void;
 }
 
 export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
@@ -16,13 +15,27 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
   const queryClient = useQueryClient();
 
   const scanMutation = useMutation({
-    mutationFn: async (scanData: ScanRequest): Promise<ScanResponse> => {
-      const response = await apiRequest("POST", "/api/scan", scanData);
+    mutationFn: async (): Promise<FastApiScanResponse> => {
+      const response = await apiRequest("GET", `/scan?mode=${encodeURIComponent(mode)}`);
       return response.json();
     },
     onSuccess: (result) => {
-      onScanComplete(result);
-      queryClient.invalidateQueries({ queryKey: ["/api/history"] });
+      // Transform FastAPI response to expected format
+      const items: ItemStatus[] = result.items.map((item: FastApiItemStatus) => ({
+        name: item.name,
+        detected: item.status === "detected"
+      }));
+      
+      const missingItems = items.filter(item => !item.detected).map(item => item.name);
+      const allDetected = missingItems.length === 0;
+      
+      onScanComplete({
+        items,
+        allDetected,
+        missingItems
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/history"] });
     },
     onError: (error) => {
       toast({
@@ -34,7 +47,7 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
   });
 
   const handleScan = () => {
-    scanMutation.mutate({ mode });
+    scanMutation.mutate();
   };
 
   return (

@@ -4,22 +4,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle, Clock, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { ScanHistory } from "@shared/schema";
+import type { FastApiHistoryItem } from "@shared/schema";
 
 export default function History() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: history, isLoading } = useQuery<ScanHistory[]>({
-    queryKey: ["/api/history"],
+  const { data: history, isLoading } = useQuery<FastApiHistoryItem[]>({
+    queryKey: ["/history"],
   });
 
   const clearHistoryMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", "/api/history");
+      await apiRequest("DELETE", "/history");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/history"] });
       toast({
         title: "History Cleared",
         description: "All scan history has been cleared successfully.",
@@ -34,7 +34,7 @@ export default function History() {
     },
   });
 
-  const formatTimestamp = (timestamp: Date) => {
+  const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -118,30 +118,14 @@ export default function History() {
                   <div
                     key={event.id}
                     data-testid={`history-item-${event.id}`}
-                    className={`flex items-start gap-3 p-3 rounded-md slide-up ${
-                      event.allItemsDetected
-                        ? "bg-primary/5 border-l-4 border-primary"
-                        : "bg-destructive/5 border-l-4 border-destructive"
-                    }`}
+                    className="flex items-start gap-3 p-3 rounded-md slide-up bg-destructive/5 border-l-4 border-destructive"
                   >
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 ${
-                      event.allItemsDetected
-                        ? "bg-primary/10"
-                        : "bg-destructive/10"
-                    }`}>
-                      {event.allItemsDetected ? (
-                        <CheckCircle className="w-4 h-4 text-primary" />
-                      ) : (
-                        <AlertTriangle className="w-4 h-4 text-destructive" />
-                      )}
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 bg-destructive/10">
+                      <AlertTriangle className="w-4 h-4 text-destructive" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">
-                        {event.allItemsDetected ? (
-                          <>All items detected in {event.mode}</>
-                        ) : (
-                          <>{event.missingItems.join(", ")} missing in {event.mode}</>
-                        )}
+                        {event.item_name} missing in {event.mode}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatTimestamp(event.timestamp)}

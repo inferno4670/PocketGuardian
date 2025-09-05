@@ -14,24 +14,24 @@ export const modes: Record<string, ModeConfig> = {
       { name: "Keys", icon: "fas fa-key" }
     ]
   },
-  "College Mode": {
-    name: "College Mode", 
+  "College": {
+    name: "College",
     items: [
       { name: "Wallet", icon: "fas fa-wallet" },
       { name: "ID", icon: "fas fa-id-card" },
       { name: "Earbuds", icon: "fas fa-headphones" }
     ]
   },
-  "Gym Mode": {
-    name: "Gym Mode",
+  "Gym": {
+    name: "Gym",
     items: [
       { name: "Wallet", icon: "fas fa-wallet" },
       { name: "Bottle", icon: "fas fa-bottle-water" },
       { name: "Towel", icon: "fas fa-bath" }
     ]
   },
-  "Trip Mode": {
-    name: "Trip Mode",
+  "Trip": {
+    name: "Trip",
     items: [
       { name: "Wallet", icon: "fas fa-wallet" },
       { name: "Charger", icon: "fas fa-charging-station" },

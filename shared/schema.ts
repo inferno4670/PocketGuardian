@@ -18,7 +18,26 @@ export const insertScanHistorySchema = createInsertSchema(scanHistory).omit({
 export type InsertScanHistory = z.infer<typeof insertScanHistorySchema>;
 export type ScanHistory = typeof scanHistory.$inferSelect;
 
-// Item status for scanning
+// FastAPI compatible schemas
+export const fastApiItemStatusSchema = z.object({
+  name: z.string(),
+  status: z.enum(["detected", "missing"]),
+});
+
+export const fastApiScanResponseSchema = z.object({
+  mode: z.string(),
+  items: z.array(fastApiItemStatusSchema),
+});
+
+export const fastApiHistoryItemSchema = z.object({
+  id: z.number(),
+  item_name: z.string(),
+  mode: z.string(),
+  timestamp: z.string(),
+  status: z.string(),
+});
+
+// Legacy schemas for backward compatibility
 export const itemStatusSchema = z.object({
   name: z.string(),
   detected: z.boolean(),
@@ -33,6 +52,10 @@ export const scanResponseSchema = z.object({
   allDetected: z.boolean(),
   missingItems: z.array(z.string()),
 });
+
+export type FastApiItemStatus = z.infer<typeof fastApiItemStatusSchema>;
+export type FastApiScanResponse = z.infer<typeof fastApiScanResponseSchema>;
+export type FastApiHistoryItem = z.infer<typeof fastApiHistoryItemSchema>;
 
 export type ItemStatus = z.infer<typeof itemStatusSchema>;
 export type ScanRequest = z.infer<typeof scanRequestSchema>;

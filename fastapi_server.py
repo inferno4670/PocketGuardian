@@ -23,9 +23,9 @@ history_storage: List[Dict[str, Any]] = []
 # Mode configurations
 MODES = {
     "Daily Essentials": ["Wallet", "Keys"],
-    "College Mode": ["Wallet", "ID", "Earbuds"],
-    "Gym Mode": ["Wallet", "Bottle", "Towel"],
-    "Trip Mode": ["Wallet", "Charger", "Powerbank"]
+    "College": ["Wallet", "ID", "Earbuds"],
+    "Gym": ["Wallet", "Bottle", "Towel"],
+    "Trip": ["Wallet", "Charger", "Powerbank"]
 }
 
 # Pydantic models

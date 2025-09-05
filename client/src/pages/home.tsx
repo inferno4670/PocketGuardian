@@ -4,7 +4,7 @@ import { ModeSelector } from "@/components/mode-selector";
 import { ItemChecklist } from "@/components/item-checklist";
 import { ScanButton } from "@/components/scan-button";
 import { AlertModal } from "@/components/alert-modal";
-import type { ItemStatus, ScanResponse } from "@shared/schema";
+import type { ItemStatus } from "@shared/schema";
 
 export default function Home() {
   const [currentMode, setCurrentMode] = useState("Daily Essentials");
@@ -43,7 +43,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleScanComplete = (result: ScanResponse) => {
+  const handleScanComplete = (result: { items: ItemStatus[], allDetected: boolean, missingItems: string[] }) => {
     setItems(result.items);
     setLastScanTime("Just now");
     localStorage.setItem("lastScanTime", new Date().toISOString());
