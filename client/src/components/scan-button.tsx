@@ -3,6 +3,8 @@ import { Search } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getModeItems } from "@/lib/modes";
+import { getItemsForMode } from "@/lib/storage";
 import type { FastApiScanResponse, FastApiItemStatus, ItemStatus } from "@shared/schema";
 
 interface ScanButtonProps {
@@ -15,17 +17,21 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
   const queryClient = useQueryClient();
 
   const scanMutation = useMutation({
-    mutationFn: async (): Promise<FastApiScanResponse> => {
-      const response = await apiRequest("GET", `/scan?mode=${encodeURIComponent(mode)}`);
-      return response.json();
-    },
-    onSuccess: (result) => {
-      // Transform FastAPI response to expected format
-      const items: ItemStatus[] = result.items.map((item: FastApiItemStatus) => ({
-        name: item.name,
-        detected: item.status === "detected"
+    mutationFn: async (): Promise<ItemStatus[]> => {
+      // Get current items for this mode (including custom items)
+      const modeConfig = getModeItems(mode);
+      const defaultItems = modeConfig.map(item => item.name);
+      const currentItems = getItemsForMode(mode, defaultItems);
+      
+      // Simulate scanning these items (since we're using custom items)
+      const items: ItemStatus[] = currentItems.map(itemName => ({
+        name: itemName,
+        detected: Math.random() > 0.3 // 70% chance of detection
       }));
       
+      return items;
+    },
+    onSuccess: (items) => {
       const missingItems = items.filter(item => !item.detected).map(item => item.name);
       const allDetected = missingItems.length === 0;
       

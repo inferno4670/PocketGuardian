@@ -4,6 +4,7 @@ import { ModeSelector } from "@/components/mode-selector";
 import { ItemChecklist } from "@/components/item-checklist";
 import { ScanButton } from "@/components/scan-button";
 import { AlertModal } from "@/components/alert-modal";
+import { saveToHistory } from "@/lib/storage";
 import type { ItemStatus } from "@shared/schema";
 
 export default function Home() {
@@ -14,11 +15,13 @@ export default function Home() {
     type: "success" | "warning";
     title: string;
     message: string;
+    playAlarm: boolean;
   }>({
     isVisible: false,
     type: "success",
     title: "",
-    message: ""
+    message: "",
+    playAlarm: false
   });
   const [lastScanTime, setLastScanTime] = useState<string>("");
 
@@ -53,21 +56,34 @@ export default function Home() {
         isVisible: true,
         type: "success",
         title: "All Items Ready!",
-        message: "✅ All your essentials are detected"
+        message: "✅ All your essentials are detected",
+        playAlarm: false
       });
     } else {
       const missingItems = result.missingItems.join(", ");
+      
+      // Save each missing item to localStorage history
+      const currentTime = new Date().toISOString();
+      result.missingItems.forEach(itemName => {
+        saveToHistory({
+          item_name: itemName,
+          mode: currentMode,
+          timestamp: currentTime
+        });
+      });
+
       setAlertState({
         isVisible: true,
         type: "warning", 
         title: "Items Missing!",
-        message: `⚠️ ${missingItems} missing!`
+        message: `⚠️ ${missingItems} missing!`,
+        playAlarm: true
       });
     }
   };
 
   const closeAlert = () => {
-    setAlertState(prev => ({ ...prev, isVisible: false }));
+    setAlertState(prev => ({ ...prev, isVisible: false, playAlarm: false }));
   };
 
   return (
@@ -107,6 +123,7 @@ export default function Home() {
         type={alertState.type}
         title={alertState.title}
         message={alertState.message}
+        playAlarm={alertState.playAlarm}
         onClose={closeAlert}
       />
     </div>

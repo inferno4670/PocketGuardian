@@ -1,38 +1,64 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, Clock, Trash2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { AlertTriangle, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { FastApiHistoryItem } from "@shared/schema";
+import { getStoredHistory, clearStoredHistory } from "@/lib/storage";
+
+interface HistoryEntry {
+  id: string;
+  item_name: string;
+  mode: string;
+  timestamp: string;
+}
 
 export default function History() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: history, isLoading } = useQuery<FastApiHistoryItem[]>({
-    queryKey: ["/history"],
-  });
+  // Load history from localStorage
+  useEffect(() => {
+    const loadHistory = () => {
+      setIsLoading(true);
+      try {
+        const storedHistory = getStoredHistory();
+        setHistory(storedHistory);
+      } catch (error) {
+        console.error("Failed to load history:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load scan history.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const clearHistoryMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", "/history");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/history"] });
+    loadHistory();
+    
+    // Set up an interval to refresh history in case it's updated elsewhere
+    const interval = setInterval(loadHistory, 5000);
+    return () => clearInterval(interval);
+  }, [toast]);
+
+  const handleClearHistory = () => {
+    try {
+      clearStoredHistory();
+      setHistory([]);
       toast({
         title: "History Cleared",
         description: "All scan history has been cleared successfully.",
       });
-    },
-    onError: () => {
+    } catch (error) {
       toast({
         title: "Error",
         description: "Failed to clear history. Please try again.",
         variant: "destructive",
       });
-    },
-  });
+    }
+  };
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -141,13 +167,12 @@ export default function History() {
           {history && history.length > 0 && (
             <Button
               data-testid="button-clear-history"
-              onClick={() => clearHistoryMutation.mutate()}
-              disabled={clearHistoryMutation.isPending}
+              onClick={handleClearHistory}
               variant="secondary"
               className="w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
-              {clearHistoryMutation.isPending ? "Clearing..." : "Clear History"}
+              Clear History
             </Button>
           )}
         </div>

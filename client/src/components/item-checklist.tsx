@@ -1,5 +1,6 @@
 import { CheckCircle, XCircle, ListChecks } from "lucide-react";
 import { getModeItems } from "@/lib/modes";
+import { getItemsForMode } from "@/lib/storage";
 import type { ItemStatus } from "@shared/schema";
 
 interface ItemChecklistProps {
@@ -8,7 +9,9 @@ interface ItemChecklistProps {
 }
 
 export function ItemChecklist({ mode, items }: ItemChecklistProps) {
-  const modeItems = getModeItems(mode);
+  const modeConfig = getModeItems(mode);
+  const defaultItems = modeConfig.map(item => item.name);
+  const currentItems = getItemsForMode(mode, defaultItems);
   
   const getItemStatus = (itemName: string): boolean => {
     const item = items.find(i => i.name === itemName);
@@ -23,17 +26,20 @@ export function ItemChecklist({ mode, items }: ItemChecklistProps) {
       </h2>
       
       <div className="space-y-3">
-        {modeItems.map((item) => {
-          const detected = getItemStatus(item.name);
+        {currentItems.map((itemName) => {
+          const detected = getItemStatus(itemName);
+          const defaultItem = modeConfig.find(item => item.name === itemName);
+          const icon = defaultItem?.icon || "fas fa-cube";
+          
           return (
             <div 
-              key={item.name}
-              data-testid={`item-${item.name.toLowerCase()}`}
+              key={itemName}
+              data-testid={`item-${itemName.toLowerCase()}`}
               className="flex items-center justify-between p-3 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors duration-200"
             >
               <div className="flex items-center gap-3">
-                <i className={`${item.icon} text-muted-foreground`} />
-                <span className="font-medium">{item.name}</span>
+                <i className={`${icon} text-muted-foreground`} />
+                <span className="font-medium">{itemName}</span>
               </div>
               <div className="status-indicator">
                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
