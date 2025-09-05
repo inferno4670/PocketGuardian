@@ -151,10 +151,10 @@ async def get_modes():
     """Get available scanning modes and their items"""
     return {"modes": MODES}
 
-@app.post("/register")
+@app.post("/register_ble")
 async def register_ble_object(ble_object: BLEObjectRegister):
     """
-    POST /register accepts object name and BLE UUID, saves in server memory
+    POST /register_ble accepts object name and BLE UUID, saves in server memory
     """
     try:
         ble_objects_storage[ble_object.object_name] = ble_object.ble_uuid
@@ -197,6 +197,23 @@ async def get_registered_objects():
         "objects": ble_objects_storage,
         "count": len(ble_objects_storage)
     }
+
+@app.delete("/register_ble/{object_name}")
+async def unregister_ble_object(object_name: str):
+    """
+    DELETE /register_ble/{object_name} removes BLE object from storage
+    """
+    try:
+        if object_name in ble_objects_storage:
+            del ble_objects_storage[object_name]
+            return {"message": f"BLE object '{object_name}' unregistered successfully"}
+        else:
+            raise HTTPException(status_code=404, detail=f"BLE object '{object_name}' not found")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to unregister BLE object: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

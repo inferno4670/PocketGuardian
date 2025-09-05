@@ -262,7 +262,7 @@ export class BLEScanner {
 
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: ['generic_access', 'generic_attribute']
+        optionalServices: ['generic_access', 'generic_attribute', 'device_information']
       });
 
       if (device.id) {
@@ -295,12 +295,31 @@ export class BLEScanner {
 
       // Get all known devices that were previously connected
       const devices = await navigator.bluetooth.getDevices();
-      const connectedDeviceIds = new Set(devices.map((d: any) => d.id));
-
-      // Check each registered device
+      
+      // Check each registered device by attempting to connect
       for (const [itemName, bleDevice] of Object.entries(registeredDevices)) {
         if (bleDevice.deviceId) {
-          results[itemName] = connectedDeviceIds.has(bleDevice.deviceId);
+          try {
+            // Find the device in the known devices list
+            const device = devices.find((d: any) => d.id === bleDevice.deviceId);
+            
+            if (device) {
+              // Try to connect to check if device is present and responsive
+              if (device.gatt && !device.gatt.connected) {
+                const server = await device.gatt.connect();
+                results[itemName] = true;
+                // Disconnect immediately to avoid keeping connections open
+                device.gatt.disconnect();
+              } else {
+                results[itemName] = device.gatt?.connected || false;
+              }
+            } else {
+              results[itemName] = false;
+            }
+          } catch (error) {
+            console.warn(`Failed to connect to ${itemName}:`, error);
+            results[itemName] = false;
+          }
         } else {
           results[itemName] = false;
         }

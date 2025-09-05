@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Settings, Plus, Trash2, Save, RefreshCw, Bluetooth, Link, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { modes as defaultModes } from "@/lib/modes";
-import { getBLEDevices, registerBLEDevice, unregisterBLEDevice, bleScanner } from "@/lib/storage";
+import { getBLEDevices, registerBLEDevice, unregisterBLEDevice } from "@/lib/storage";
 
 interface CustomModeItems {
   [mode: string]: string[];
@@ -121,19 +121,32 @@ export default function ManageItems() {
       if (!navigator.bluetooth) {
         toast({
           title: "Bluetooth Not Supported",
-          description: "Web Bluetooth API is not supported in this browser.",
+          description: "Web Bluetooth API is not supported in this browser. Please use Chrome, Edge, or another supported browser.",
           variant: "destructive",
         });
         return;
       }
 
-      const device = await bleScanner.requestDevice(itemName);
+      // Request BLE device using Web Bluetooth API
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['generic_access', 'generic_attribute', 'device_information']
+      });
       
-      if (device) {
+      if (device && device.id) {
+        // Save to localStorage
+        const bleDevice = {
+          id: device.id,
+          name: itemName,
+          deviceId: device.id
+        };
+        
+        registerBLEDevice(itemName, bleDevice);
         setBleDevices(getBLEDevices()); // Refresh BLE devices
+        
         toast({
-          title: "BLE Device Linked",
-          description: `${itemName} has been linked to a Bluetooth device.`,
+          title: "BLE Tag Registered",
+          description: `${itemName} has been linked to BLE device: ${device.name || device.id}`,
         });
       }
     } catch (error: any) {
@@ -142,19 +155,19 @@ export default function ManageItems() {
       if (error.name === 'NotFoundError') {
         toast({
           title: "No Device Selected",
-          description: "No Bluetooth device was selected.",
+          description: "No Bluetooth device was selected for pairing.",
           variant: "destructive",
         });
       } else if (error.name === 'NotAllowedError') {
         toast({
           title: "Permission Denied",
-          description: "Bluetooth access was denied.",
+          description: "Bluetooth access was denied. Please allow Bluetooth permissions and try again.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Linking Failed",
-          description: "Failed to link BLE device.",
+          title: "Registration Failed",
+          description: "Failed to register BLE tag. Please try again.",
           variant: "destructive",
         });
       }
@@ -167,8 +180,8 @@ export default function ManageItems() {
     unregisterBLEDevice(itemName);
     setBleDevices(getBLEDevices()); // Refresh BLE devices
     toast({
-      title: "BLE Device Unlinked",
-      description: `${itemName} has been unlinked from its Bluetooth device.`,
+      title: "BLE Tag Removed",
+      description: `${itemName} has been unlinked from its BLE tag.`,
     });
   };
 
@@ -240,27 +253,36 @@ export default function ManageItems() {
                         <div className="flex items-center gap-2">
                           {isLinkedToBLE ? (
                             <Button
-                              data-testid={`unlink-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                              data-testid={`remove-ble-${item.toLowerCase().replace(/\s+/g, '-')}`}
                               onClick={() => unlinkBLEDevice(item)}
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2"
+                              className="h-8 px-3 text-xs"
+                              title="Remove BLE Tag"
                             >
-                              <Unlink className="w-3 h-3" />
+                              <Unlink className="w-3 h-3 mr-1" />
+                              Remove BLE
                             </Button>
                           ) : (
                             <Button
-                              data-testid={`link-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                              data-testid={`register-ble-${item.toLowerCase().replace(/\s+/g, '-')}`}
                               onClick={() => linkBLEDevice(item)}
                               disabled={isLinkingBLE === item}
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2"
+                              className="h-8 px-3 text-xs"
+                              title="Register BLE Tag"
                             >
                               {isLinkingBLE === item ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent"></div>
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent mr-1"></div>
+                                  Pairing...
+                                </>
                               ) : (
-                                <Link className="w-3 h-3" />
+                                <>
+                                  <Bluetooth className="w-3 h-3 mr-1" />
+                                  Register BLE
+                                </>
                               )}
                             </Button>
                           )}

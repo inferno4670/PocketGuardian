@@ -27,11 +27,47 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
       const bleDevices = getBLEDevices();
       const bleResults: { [itemName: string]: boolean } = {};
       
-      // Scan for BLE devices first
+      // Scan for BLE devices first if any are registered
       if (Object.keys(bleDevices).length > 0) {
         try {
-          const scanResults = await bleScanner.scanForDevices(bleDevices);
-          Object.assign(bleResults, scanResults);
+          // Check if Web Bluetooth is available
+          if (navigator.bluetooth) {
+            const devices = await navigator.bluetooth.getDevices();
+            
+            // Check each registered BLE device
+            for (const [itemName, bleDevice] of Object.entries(bleDevices)) {
+              if (bleDevice.deviceId) {
+                try {
+                  // Find the device in the known devices list
+                  const device = devices.find((d: any) => d.id === bleDevice.deviceId);
+                  
+                  if (device) {
+                    // Attempt to connect to check if device is present
+                    if (device.gatt && !device.gatt.connected) {
+                      try {
+                        await device.gatt.connect();
+                        bleResults[itemName] = true;
+                        // Disconnect immediately to avoid keeping connections open
+                        device.gatt.disconnect();
+                      } catch (connectError) {
+                        console.warn(`Failed to connect to ${itemName}:`, connectError);
+                        bleResults[itemName] = false;
+                      }
+                    } else {
+                      bleResults[itemName] = device.gatt?.connected || false;
+                    }
+                  } else {
+                    bleResults[itemName] = false;
+                  }
+                } catch (error) {
+                  console.warn(`BLE scan failed for ${itemName}:`, error);
+                  bleResults[itemName] = false;
+                }
+              }
+            }
+          } else {
+            console.warn("Web Bluetooth API not available");
+          }
         } catch (error) {
           console.warn("BLE scanning failed:", error);
         }
