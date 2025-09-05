@@ -4,6 +4,7 @@ import { ModeSelector } from "@/components/mode-selector";
 import { ItemChecklist } from "@/components/item-checklist";
 import { ScanButton } from "@/components/scan-button";
 import { AlertModal } from "@/components/alert-modal";
+import { RegisterObjectButton } from "@/components/register-object-button";
 import { saveToHistory } from "@/lib/storage";
 import type { ItemStatus } from "@shared/schema";
 
@@ -105,8 +106,11 @@ export default function Home() {
           {/* Items Checklist */}
           <ItemChecklist mode={currentMode} items={items} />
 
-          {/* Scan Button */}
-          <ScanButton mode={currentMode} onScanComplete={handleScanComplete} />
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <ScanButton mode={currentMode} onScanComplete={handleScanComplete} />
+            <RegisterObjectButton />
+          </div>
 
           {/* Last Scan Info */}
           {lastScanTime && (

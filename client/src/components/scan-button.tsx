@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, Bluetooth } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getModeItems } from "@/lib/modes";
-import { getItemsForMode } from "@/lib/storage";
+import { getItemsForMode, getBLEDevices, bleScanner } from "@/lib/storage";
 import type { FastApiScanResponse, FastApiItemStatus, ItemStatus } from "@shared/schema";
 
 interface ScanButtonProps {
@@ -23,32 +23,38 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
       const defaultItems = modeConfig.map(item => item.name);
       const currentItems = getItemsForMode(mode, defaultItems);
       
-      try {
-        // Try to use FastAPI backend first
-        const response = await apiRequest("POST", "/scan", {
-          mode: mode,
-          custom_items: currentItems
-        });
-        const result = await response.json();
+      // Get registered BLE devices
+      const bleDevices = getBLEDevices();
+      const bleResults: { [itemName: string]: boolean } = {};
+      
+      // Scan for BLE devices first
+      if (Object.keys(bleDevices).length > 0) {
+        try {
+          const scanResults = await bleScanner.scanForDevices(bleDevices);
+          Object.assign(bleResults, scanResults);
+        } catch (error) {
+          console.warn("BLE scanning failed:", error);
+        }
+      }
+      
+      // Create items list combining BLE results and simulated results
+      const items: ItemStatus[] = currentItems.map(itemName => {
+        // If item has BLE device registered, use BLE scan result
+        if (bleDevices[itemName]) {
+          return {
+            name: itemName,
+            detected: bleResults[itemName] || false
+          };
+        }
         
-        // Transform FastAPI response to expected format
-        const items: ItemStatus[] = result.items.map((item: any) => ({
-          name: item.name,
-          detected: item.status === "detected"
-        }));
-        
-        return items;
-      } catch (error) {
-        console.warn("FastAPI backend not available, using local simulation:", error);
-        
-        // Fallback to local simulation if FastAPI is not available
-        const items: ItemStatus[] = currentItems.map(itemName => ({
+        // Otherwise simulate detection (for non-BLE items)
+        return {
           name: itemName,
           detected: Math.random() > 0.3 // 70% chance of detection
-        }));
-        
-        return items;
-      }
+        };
+      });
+      
+      return items;
     },
     onSuccess: (items) => {
       const missingItems = items.filter(item => !item.detected).map(item => item.name);
@@ -84,8 +90,18 @@ export function ScanButton({ mode, onScanComplete }: ScanButtonProps) {
         scanMutation.isPending ? "scan-pulse" : ""
       }`}
     >
-      <Search className="w-5 h-5" />
-      <span>{scanMutation.isPending ? "Scanning..." : "Scan Items"}</span>
+      {scanMutation.isPending ? (
+        <>
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          <span>Scanning...</span>
+        </>
+      ) : (
+        <>
+          <Search className="w-4 h-4" />
+          <Bluetooth className="w-4 h-4" />
+          <span>Scan Items</span>
+        </>
+      )}
     </Button>
   );
 }

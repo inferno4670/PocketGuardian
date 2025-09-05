@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Plus, Trash2, Save, RefreshCw } from "lucide-react";
+import { Settings, Plus, Trash2, Save, RefreshCw, Bluetooth, Link, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { modes as defaultModes } from "@/lib/modes";
+import { getBLEDevices, registerBLEDevice, unregisterBLEDevice, bleScanner } from "@/lib/storage";
 
 interface CustomModeItems {
   [mode: string]: string[];
@@ -18,8 +19,10 @@ export default function ManageItems() {
   const [customItems, setCustomItems] = useState<CustomModeItems>({});
   const [newItemName, setNewItemName] = useState("");
   const [currentItems, setCurrentItems] = useState<string[]>([]);
+  const [bleDevices, setBleDevices] = useState<any>({});
+  const [isLinkingBLE, setIsLinkingBLE] = useState<string | null>(null);
 
-  // Load custom items from localStorage on component mount
+  // Load custom items and BLE devices from localStorage on component mount
   useEffect(() => {
     const savedCustomItems = localStorage.getItem("pocketguardian_custom_items");
     if (savedCustomItems) {
@@ -30,6 +33,9 @@ export default function ManageItems() {
         console.error("Failed to parse custom items from localStorage:", error);
       }
     }
+    
+    // Load BLE devices
+    setBleDevices(getBLEDevices());
   }, []);
 
   // Update current items when mode or custom items change
@@ -108,6 +114,64 @@ export default function ManageItems() {
     });
   };
 
+  const linkBLEDevice = async (itemName: string) => {
+    try {
+      setIsLinkingBLE(itemName);
+      
+      if (!navigator.bluetooth) {
+        toast({
+          title: "Bluetooth Not Supported",
+          description: "Web Bluetooth API is not supported in this browser.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const device = await bleScanner.requestDevice(itemName);
+      
+      if (device) {
+        setBleDevices(getBLEDevices()); // Refresh BLE devices
+        toast({
+          title: "BLE Device Linked",
+          description: `${itemName} has been linked to a Bluetooth device.`,
+        });
+      }
+    } catch (error: any) {
+      console.error("BLE linking failed:", error);
+      
+      if (error.name === 'NotFoundError') {
+        toast({
+          title: "No Device Selected",
+          description: "No Bluetooth device was selected.",
+          variant: "destructive",
+        });
+      } else if (error.name === 'NotAllowedError') {
+        toast({
+          title: "Permission Denied",
+          description: "Bluetooth access was denied.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Linking Failed",
+          description: "Failed to link BLE device.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsLinkingBLE(null);
+    }
+  };
+
+  const unlinkBLEDevice = (itemName: string) => {
+    unregisterBLEDevice(itemName);
+    setBleDevices(getBLEDevices()); // Refresh BLE devices
+    toast({
+      title: "BLE Device Unlinked",
+      description: `${itemName} has been unlinked from its Bluetooth device.`,
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-md mx-auto w-full px-4 py-6">
@@ -156,24 +220,63 @@ export default function ManageItems() {
                     No items configured for this mode
                   </p>
                 ) : (
-                  currentItems.map((item, index) => (
-                    <div
-                      key={index}
-                      data-testid={`item-${item.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="flex items-center justify-between p-3 bg-secondary/30 rounded-md"
-                    >
-                      <span className="font-medium">{item}</span>
-                      <Button
-                        data-testid={`remove-${item.toLowerCase().replace(/\s+/g, '-')}`}
-                        onClick={() => removeItem(item)}
-                        variant="destructive"
-                        size="sm"
-                        className="h-8 w-8 p-0"
+                  currentItems.map((item, index) => {
+                    const isLinkedToBLE = bleDevices[item];
+                    return (
+                      <div
+                        key={index}
+                        data-testid={`item-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                        className="flex items-center justify-between p-3 bg-secondary/30 rounded-md"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="font-medium">{item}</span>
+                          {isLinkedToBLE && (
+                            <div className="flex items-center gap-1 text-xs text-blue-600">
+                              <Bluetooth className="w-3 h-3" />
+                              <span>BLE</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isLinkedToBLE ? (
+                            <Button
+                              data-testid={`unlink-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                              onClick={() => unlinkBLEDevice(item)}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2"
+                            >
+                              <Unlink className="w-3 h-3" />
+                            </Button>
+                          ) : (
+                            <Button
+                              data-testid={`link-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                              onClick={() => linkBLEDevice(item)}
+                              disabled={isLinkingBLE === item}
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2"
+                            >
+                              {isLinkingBLE === item ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent"></div>
+                              ) : (
+                                <Link className="w-3 h-3" />
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            data-testid={`remove-${item.toLowerCase().replace(/\s+/g, '-')}`}
+                            onClick={() => removeItem(item)}
+                            variant="destructive"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </CardContent>

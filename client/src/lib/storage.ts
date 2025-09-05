@@ -1,5 +1,15 @@
 // LocalStorage utility functions for PocketGuardian
 
+// Web Bluetooth API type declarations
+declare global {
+  interface Navigator {
+    bluetooth?: {
+      requestDevice(options: any): Promise<any>;
+      getDevices(): Promise<any[]>;
+    };
+  }
+}
+
 interface CustomModeItems {
   [mode: string]: string[];
 }
@@ -9,6 +19,16 @@ interface HistoryEntry {
   item_name: string;
   mode: string;
   timestamp: string;
+}
+
+interface BLEDevice {
+  id: string;
+  name: string;
+  deviceId?: string;
+}
+
+interface BLEDeviceMap {
+  [itemName: string]: BLEDevice;
 }
 
 // Custom Items Management
@@ -195,5 +215,113 @@ export class AlarmManager {
   }
 }
 
+// BLE Device Management
+export const getBLEDevices = (): BLEDeviceMap => {
+  try {
+    const saved = localStorage.getItem("pocketguardian_ble_devices");
+    return saved ? JSON.parse(saved) : {};
+  } catch (error) {
+    console.error("Failed to parse BLE devices from localStorage:", error);
+    return {};
+  }
+};
+
+export const saveBLEDevices = (bleDevices: BLEDeviceMap): void => {
+  localStorage.setItem("pocketguardian_ble_devices", JSON.stringify(bleDevices));
+};
+
+export const registerBLEDevice = (itemName: string, device: BLEDevice): void => {
+  const bleDevices = getBLEDevices();
+  bleDevices[itemName] = device;
+  saveBLEDevices(bleDevices);
+};
+
+export const unregisterBLEDevice = (itemName: string): void => {
+  const bleDevices = getBLEDevices();
+  delete bleDevices[itemName];
+  saveBLEDevices(bleDevices);
+};
+
+// BLE Scanner Class
+export class BLEScanner {
+  private static instance: BLEScanner;
+  private isScanning = false;
+
+  static getInstance(): BLEScanner {
+    if (!BLEScanner.instance) {
+      BLEScanner.instance = new BLEScanner();
+    }
+    return BLEScanner.instance;
+  }
+
+  async requestDevice(itemName: string): Promise<BLEDevice | null> {
+    try {
+      if (!navigator.bluetooth) {
+        throw new Error("Web Bluetooth API is not supported in this browser.");
+      }
+
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['generic_access', 'generic_attribute']
+      });
+
+      if (device.id) {
+        const bleDevice: BLEDevice = {
+          id: device.id,
+          name: itemName,
+          deviceId: device.id
+        };
+        
+        registerBLEDevice(itemName, bleDevice);
+        return bleDevice;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error requesting BLE device:", error);
+      throw error;
+    }
+  }
+
+  async scanForDevices(registeredDevices: BLEDeviceMap): Promise<{ [itemName: string]: boolean }> {
+    try {
+      if (!navigator.bluetooth) {
+        console.warn("Web Bluetooth API is not supported");
+        return {};
+      }
+
+      this.isScanning = true;
+      const results: { [itemName: string]: boolean } = {};
+
+      // Get all known devices that were previously connected
+      const devices = await navigator.bluetooth.getDevices();
+      const connectedDeviceIds = new Set(devices.map((d: any) => d.id));
+
+      // Check each registered device
+      for (const [itemName, bleDevice] of Object.entries(registeredDevices)) {
+        if (bleDevice.deviceId) {
+          results[itemName] = connectedDeviceIds.has(bleDevice.deviceId);
+        } else {
+          results[itemName] = false;
+        }
+      }
+
+      this.isScanning = false;
+      return results;
+    } catch (error) {
+      console.error("Error scanning for BLE devices:", error);
+      this.isScanning = false;
+      return {};
+    }
+  }
+
+  isCurrentlyScanning(): boolean {
+    return this.isScanning;
+  }
+}
+
 // Global alarm manager instance
 export const alarmManager = new AlarmManager();
+
+// Global BLE scanner instance
+export const bleScanner = BLEScanner.getInstance();
