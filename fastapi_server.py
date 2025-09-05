@@ -20,6 +20,9 @@ app.add_middleware(
 # In-memory storage for history
 history_storage: List[Dict[str, Any]] = []
 
+# In-memory storage for registered BLE objects
+ble_objects_storage: Dict[str, str] = {}  # {object_name: ble_uuid}
+
 # Mode configurations with example mock data
 MODES = {
     "Daily": ["Wallet", "Keys"],
@@ -48,6 +51,16 @@ class HistoryEntry(BaseModel):
     mode: str
     timestamp: str
     status: str
+
+class BLEObjectRegister(BaseModel):
+    object_name: str
+    ble_uuid: str
+
+class BLEScanRequest(BaseModel):
+    ble_uuids: List[str]
+
+class BLEScanResponse(BaseModel):
+    results: Dict[str, str]  # {object_name: "present" | "missing"}
 
 def simulate_scan(mode: str, custom_items: Optional[List[str]] = None) -> List[Dict[str, str]]:
     """Simulate BLE/NFC scan with random mock values"""
@@ -137,6 +150,53 @@ async def clear_history():
 async def get_modes():
     """Get available scanning modes and their items"""
     return {"modes": MODES}
+
+@app.post("/register")
+async def register_ble_object(ble_object: BLEObjectRegister):
+    """
+    POST /register accepts object name and BLE UUID, saves in server memory
+    """
+    try:
+        ble_objects_storage[ble_object.object_name] = ble_object.ble_uuid
+        
+        return {
+            "message": "BLE object registered successfully",
+            "object_name": ble_object.object_name,
+            "ble_uuid": ble_object.ble_uuid
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to register BLE object: {str(e)}")
+
+@app.post("/scan/ble")
+async def scan_ble_objects(scan_request: BLEScanRequest):
+    """
+    POST /scan/ble accepts BLE UUID list and responds with which objects are present/missing
+    """
+    try:
+        results = {}
+        
+        # Check each registered BLE object
+        for object_name, stored_uuid in ble_objects_storage.items():
+            if stored_uuid in scan_request.ble_uuids:
+                results[object_name] = "present"
+            else:
+                results[object_name] = "missing"
+        
+        return BLEScanResponse(results=results)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BLE scan failed: {str(e)}")
+
+@app.get("/objects")
+async def get_registered_objects():
+    """
+    GET /objects returns full list of registered BLE objects
+    """
+    return {
+        "objects": ble_objects_storage,
+        "count": len(ble_objects_storage)
+    }
 
 if __name__ == "__main__":
     import uvicorn
