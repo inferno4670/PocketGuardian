@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pocket Guardian - Smart Item Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                    colors: {
+                        background: "var(--background)",
+                        foreground: "var(--foreground)",
+                        card: {
+                            DEFAULT: "var(--card)",
+                            foreground: "var(--card-foreground)",
+                        },
+                        primary: {
+                            DEFAULT: "var(--primary)",
+                            foreground: "var(--primary-foreground)",
+                        },
+                        secondary: {
+                            DEFAULT: "var(--secondary)",
+                            foreground: "var(--secondary-foreground)",
+                        },
+                        muted: {
+                            DEFAULT: "var(--muted)",
+                            foreground: "var(--muted-foreground)",
+                        },
+                        accent: {
+                            DEFAULT: "var(--accent)",
+                            foreground: "var(--accent-foreground)",
+                        },
+                        destructive: {
+                            DEFAULT: "var(--destructive)",
+                            foreground: "var(--destructive-foreground)",
+                        },
+                        border: "var(--border)",
+                        input: "var(--input)",
+                        ring: "var(--ring)",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "system-ui", "sans-serif"],
+                    }
+                },
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --background: hsl(0 0% 100%);
+            --foreground: hsl(222 84% 5%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222 84% 5%);
+            --primary: hsl(142 76% 36%);
+            --primary-foreground: hsl(0 0% 98%);
+            --secondary: hsl(220 14% 96%);
+            --secondary-foreground: hsl(220 9% 46%);
+            --muted: hsl(220 14% 96%);
+            --muted-foreground: hsl(220 9% 46%);
+            --accent: hsl(142 76% 36%);
+            --accent-foreground: hsl(0 0% 98%);
+            --destructive: hsl(0 84% 60%);
+            --destructive-foreground: hsl(0 0% 98%);
+            --border: hsl(220 13% 91%);
+            --input: hsl(220 13% 91%);
+            --ring: hsl(142 76% 36%);
+            --radius: 0.5rem;
+        }
+
+        * {
+            border-color: var(--border);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+        }
+
+        .status-indicator {
+            transition: all 0.2s ease;
+        }
+
+        .scan-pulse {
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .modal-backdrop {
+            backdrop-filter: blur(8px);
+        }
+
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-background text-foreground">
+    <!-- @COMPONENT: App [main application container] -->
+    <div id="app" class="min-h-screen flex flex-col">
+        
+        <!-- @COMPONENT: Navigation [tab navigation between Home and History] -->
+        <nav class="bg-card border-b border-border sticky top-0 z-40">
+            <!-- @END_COMPONENT: Navigation -->
+            <div class="max-w-md mx-auto px-4">
+                <div class="flex">
+                    <button id="home-tab" class="flex-1 py-4 px-6 text-center font-medium text-primary border-b-2 border-primary transition-colors duration-200">
+                        <i class="fas fa-home mr-2"></i>Home
+                    </button>
+                    <button id="history-tab" class="flex-1 py-4 px-6 text-center font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground hover:border-muted transition-colors duration-200">
+                        <i class="fas fa-history mr-2"></i>History
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-1 max-w-md mx-auto w-full px-4 py-6">
+            
+            <!-- @COMPONENT: HomeScreen [main dashboard view] -->
+            <!-- @STATE: currentMode:string = "Daily Essentials" -->
+            <!-- @STATE: items:object = {} -->
+            <!-- @STATE: isScanning:boolean = false -->
+            <div id="home-screen" class="space-y-6">
+                
+                <!-- Hero Section -->
+                <div class="text-center space-y-2">
+                    <h1 class="text-3xl font-bold text-foreground flex items-center justify-center gap-2">
+                        <i class="fas fa-shield-alt text-primary"></i>
+                        Pocket Guardian
+                    </h1>
+                    <p class="text-muted-foreground">Never forget your essentials</p>
+                </div>
+
+                <!-- Mode Selection -->
+                <!-- @COMPONENT: ModeSelector [dropdown for selecting item modes] -->
+                <div class="bg-card rounded-lg border border-border p-4 shadow-sm">
+                    <label class="block text-sm font-medium text-foreground mb-2">Select Mode</label>
+                    <select id="mode-selector" class="w-full px-3 py-2 bg-input border border-border rounded-md focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200" data-implementation="Should update item list based on selection">
+                        <option value="Daily Essentials" data-items='["Wallet", "Keys"]'>Daily Essentials</option>
+                        <option value="College Mode" data-items='["Wallet", "ID", "Earbuds"]'>College Mode</option>
+                        <option value="Gym Mode" data-items='["Wallet", "Bottle", "Towel"]'>Gym Mode</option>
+                        <option value="Trip Mode" data-items='["Wallet", "Charger", "Powerbank"]'>Trip Mode</option>
+                    </select>
+                </div>
+                <!-- @END_COMPONENT: ModeSelector -->
+
+                <!-- Items Checklist -->
+                <!-- @COMPONENT: ItemChecklist [displays items with status indicators] -->
+                <div class="bg-card rounded-lg border border-border p-4 shadow-sm">
+                    <h2 class="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                        <i class="fas fa-list-check text-primary"></i>
+                        Item Status
+                    </h2>
+                    
+                    <!-- @MAP: currentModeItems.map(item => ( -->
+                    <div id="items-list" class="space-y-3">
+                        <div class="item-row flex items-center justify-between p-3 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors duration-200" data-item="Wallet" data-mock="true">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-wallet text-muted-foreground"></i>
+                                <span class="font-medium" data-bind="item.name">Wallet</span>
+                            </div>
+                            <div class="status-indicator">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                    <i class="fas fa-check-circle"></i>
+                                    Detected
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="item-row flex items-center justify-between p-3 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors duration-200" data-item="Keys" data-mock="true">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-key text-muted-foreground"></i>
+                                <span class="font-medium" data-bind="item.name">Keys</span>
+                            </div>
+                            <div class="status-indicator">
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                                    <i class="fas fa-times-circle"></i>
+                                    Missing
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+                <!-- @END_COMPONENT: ItemChecklist -->
+
+                <!-- Scan Button -->
+                <!-- @COMPONENT: ScanButton [triggers item scanning] -->
+                <button id="scan-button" class="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg" data-event="click:handleScan" data-implementation="Should call backend API to scan for items">
+                    <i class="fas fa-search"></i>
+                    <span id="scan-text">Scan Items</span>
+                </button>
+                <!-- @END_COMPONENT: ScanButton -->
+
+                <!-- Last Scan Info -->
+                <div class="text-center text-sm text-muted-foreground">
+                    <p>Last scan: <span data-bind="lastScanTime" data-mock="true">2 minutes ago</span></p>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: HomeScreen -->
+
+            <!-- @COMPONENT: HistoryScreen [displays past missing item events] -->
+            <!-- @STATE: historyEvents:array = [] -->
+            <div id="history-screen" class="hidden space-y-6">
+                
+                <!-- Header -->
+                <div class="text-center space-y-2">
+                    <h1 class="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
+                        <i class="fas fa-history text-primary"></i>
+                        Scan History
+                    </h1>
+                    <p class="text-muted-foreground">Track your past missing items</p>
+                </div>
+
+                <!-- History List -->
+                <div class="bg-card rounded-lg border border-border p-4 shadow-sm">
+                    <h2 class="text-lg font-semibold text-foreground mb-4">Recent Events</h2>
+                    
+                    <!-- @MAP: historyEvents.map(event => ( -->
+                    <div class="space-y-3" data-mock="true">
+                        <div class="history-item flex items-start gap-3 p-3 rounded-md bg-destructive/5 border-l-4 border-destructive slide-up">
+                            <div class="flex-shrink-0 w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center mt-0.5">
+                                <i class="fas fa-exclamation-triangle text-destructive text-sm"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-foreground">
+                                    <span data-bind="event.item">Keys</span> missing in <span data-bind="event.mode">Daily Essentials</span>
+                                </p>
+                                <p class="text-xs text-muted-foreground mt-1" data-bind="event.timestamp">Today at 08:45 AM</p>
+                            </div>
+                        </div>
+
+                        <div class="history-item flex items-start gap-3 p-3 rounded-md bg-primary/5 border-l-4 border-primary slide-up">
+                            <div class="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
+                                <i class="fas fa-check text-primary text-sm"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-foreground">All items detected in College Mode</p>
+                                <p class="text-xs text-muted-foreground mt-1" data-bind="event.timestamp">Today at 07:30 AM</p>
+                            </div>
+                        </div>
+
+                        <div class="history-item flex items-start gap-3 p-3 rounded-md bg-destructive/5 border-l-4 border-destructive slide-up">
+                            <div class="flex-shrink-0 w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center mt-0.5">
+                                <i class="fas fa-exclamation-triangle text-destructive text-sm"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-foreground">
+                                    <span data-bind="event.item">Earbuds</span> missing in <span data-bind="event.mode">College Mode</span>
+                                </p>
+                                <p class="text-xs text-muted-foreground mt-1" data-bind="event.timestamp">Yesterday at 02:15 PM</p>
+                            </div>
+                        </div>
+
+                        <div class="history-item flex items-start gap-3 p-3 rounded-md bg-destructive/5 border-l-4 border-destructive slide-up">
+                            <div class="flex-shrink-0 w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center mt-0.5">
+                                <i class="fas fa-exclamation-triangle text-destructive text-sm"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-foreground">
+                                    <span data-bind="event.item">Towel</span> missing in <span data-bind="event.mode">Gym Mode</span>
+                                </p>
+                                <p class="text-xs text-muted-foreground mt-1" data-bind="event.timestamp">Yesterday at 09:20 AM</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+
+                    <!-- Empty State (hidden by default due to mock data) -->
+                    <div id="empty-history" class="hidden text-center py-8">
+                        <i class="fas fa-clock-rotate-left text-4xl text-muted-foreground mb-4"></i>
+                        <p class="text-muted-foreground">No scan history yet</p>
+                        <p class="text-sm text-muted-foreground mt-1">Your scan events will appear here</p>
+                    </div>
+                </div>
+
+                <!-- Clear History Button -->
+                <button class="w-full bg-secondary hover:bg-secondary/80 text-secondary-foreground py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2" data-event="click:clearHistory" data-implementation="Should clear all history from localStorage">
+                    <i class="fas fa-trash-alt"></i>
+                    Clear History
+                </button>
+            </div>
+            <!-- @END_COMPONENT: HistoryScreen -->
+
+        </main>
+    </div>
+    <!-- @END_COMPONENT: App -->
+
+    <!-- @COMPONENT: AlertModal [popup notifications for scan results] -->
+    <!-- @STATE: isVisible:boolean = false -->
+    <!-- @STATE: alertType:string = "success"|"warning" -->
+    <!-- @STATE: alertMessage:string = "" -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black/50 modal-backdrop flex items-center justify-center p-4 z-50" data-implementation="Should show based on scan results">
+        <div class="bg-card rounded-lg border border-border p-6 max-w-sm w-full mx-4 shadow-xl slide-up">
+            <div class="text-center space-y-4">
+                <div id="alert-icon" class="w-16 h-16 mx-auto rounded-full flex items-center justify-center">
+                    <!-- Success icon (hidden by default) -->
+                    <i id="success-icon" class="fas fa-check-circle text-3xl text-primary hidden"></i>
+                    <!-- Warning icon (visible for demo) -->
+                    <i id="warning-icon" class="fas fa-exclamation-triangle text-3xl text-destructive"></i>
+                </div>
+                
+                <div class="space-y-2">
+                    <h3 id="alert-title" class="text-lg font-semibold text-foreground" data-bind="alert.title" data-mock="true">Items Missing!</h3>
+                    <p id="alert-message" class="text-muted-foreground" data-bind="alert.message" data-mock="true">⚠️ Keys missing!</p>
+                </div>
+                
+                <button id="close-modal" class="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-2 px-4 rounded-md font-medium transition-colors duration-200" data-event="click:closeModal">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AlertModal -->
+
+    <script>
+        (function() {
+            // TODO: Implement React state management with hooks
+            // TODO: Replace with actual API calls
+            // TODO: Add localStorage integration for history persistence
+            
+            // Demo data and state
+            let currentMode = 'Daily Essentials';
+            let isScanning = false;
+            let items = {
+                'Daily Essentials': [
+                    { name: 'Wallet', icon: 'fas fa-wallet', detected: true },
+                    { name: 'Keys', icon: 'fas fa-key', detected: false }
+                ],
+                'College Mode': [
+                    { name: 'Wallet', icon: 'fas fa-wallet', detected: true },
+                    { name: 'ID', icon: 'fas fa-id-card', detected: true },
+                    { name: 'Earbuds', icon: 'fas fa-headphones', detected: false }
+                ],
+                'Gym Mode': [
+                    { name: 'Wallet', icon: 'fas fa-wallet', detected: true },
+                    { name: 'Bottle', icon: 'fas fa-bottle-water', detected: true },
+                    { name: 'Towel', icon: 'fas fa-bath', detected: false }
+                ],
+                'Trip Mode': [
+                    { name: 'Wallet', icon: 'fas fa-wallet', detected: true },
+                    { name: 'Charger', icon: 'fas fa-charging-station', detected: true },
+                    { name: 'Powerbank', icon: 'fas fa-battery-full', detected: false }
+                ]
+            };
+
+            // Navigation functionality
+            const homeTab = document.getElementById('home-tab');
+            const historyTab = document.getElementById('history-tab');
+            const homeScreen = document.getElementById('home-screen');
+            const historyScreen = document.getElementById('history-screen');
+
+            function showHome() {
+                homeScreen.classList.remove('hidden');
+                historyScreen.classList.add('hidden');
+                homeTab.classList.add('text-primary', 'border-primary');
+                homeTab.classList.remove('text-muted-foreground', 'border-transparent');
+                historyTab.classList.add('text-muted-foreground', 'border-transparent');
+                historyTab.classList.remove('text-primary', 'border-primary');
+            }
+
+            function showHistory() {
+                homeScreen.classList.add('hidden');
+                historyScreen.classList.remove('hidden');
+                historyTab.classList.add('text-primary', 'border-primary');
+                historyTab.classList.remove('text-muted-foreground', 'border-transparent');
+                homeTab.classList.add('text-muted-foreground', 'border-transparent');
+                homeTab.classList.remove('text-primary', 'border-primary');
+            }
+
+            homeTab.addEventListener('click', showHome);
+            historyTab.addEventListener('click', showHistory);
+
+            // Mode selector functionality
+            const modeSelector = document.getElementById('mode-selector');
+            const itemsList = document.getElementById('items-list');
+
+            function updateItemsList() {
+                const modeItems = items[currentMode];
+                itemsList.innerHTML = '';
+                
+                modeItems.forEach(item => {
+                    const itemRow = document.createElement('div');
+                    itemRow.className = 'item-row flex items-center justify-between p-3 rounded-md bg-secondary/30 hover:bg-secondary/50 transition-colors duration-200';
+                    itemRow.setAttribute('data-item', item.name);
+                    
+                    const statusClass = item.detected ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive';
+                    const statusIcon = item.detected ? 'fas fa-check-circle' : 'fas fa-times-circle';
+                    const statusText = item.detected ? 'Detected' : 'Missing';
+                    
+                    itemRow.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <i class="${item.icon} text-muted-foreground"></i>
+                            <span class="font-medium">${item.name}</span>
+                        </div>
+                        <div class="status-indicator">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusClass}">
+                                <i class="${statusIcon}"></i>
+                                ${statusText}
+                            </span>
+                        </div>
+                    `;
+                    
+                    itemsList.appendChild(itemRow);
+                });
+            }
+
+            modeSelector.addEventListener('change', (e) => {
+                currentMode = e.target.value;
+                updateItemsList();
+            });
+
+            // Scan functionality
+            const scanButton = document.getElementById('scan-button');
+            const scanText = document.getElementById('scan-text');
+            const alertModal = document.getElementById('alert-modal');
+            const closeModal = document.getElementById('close-modal');
+            const alertTitle = document.getElementById('alert-title');
+            const alertMessage = document.getElementById('alert-message');
+            const successIcon = document.getElementById('success-icon');
+            const warningIcon = document.getElementById('warning-icon');
+
+            function showAlert(type, title, message) {
+                alertTitle.textContent = title;
+                alertMessage.textContent = message;
+                
+                if (type === 'success') {
+                    successIcon.classList.remove('hidden');
+                    warningIcon.classList.add('hidden');
+                } else {
+                    successIcon.classList.add('hidden');
+                    warningIcon.classList.remove('hidden');
+                }
+                
+                alertModal.classList.remove('hidden');
+            }
+
+            function hideAlert() {
+                alertModal.classList.add('hidden');
+            }
+
+            scanButton.addEventListener('click', () => {
+                if (isScanning) return;
+                
+                isScanning = true;
+                scanText.textContent = 'Scanning...';
+                scanButton.classList.add('scan-pulse');
+                
+                // Simulate API call
+                setTimeout(() => {
+                    const modeItems = items[currentMode];
+                    const missingItems = modeItems.filter(item => !item.detected);
+                    
+                    if (missingItems.length === 0) {
+                        showAlert('success', 'All Items Ready!', '✅ All your essentials are detected');
+                    } else {
+                        const missingNames = missingItems.map(item => item.name).join(', ');
+                        showAlert('warning', 'Items Missing!', `⚠️ ${missingNames} missing!`);
+                    }
+                    
+                    isScanning = false;
+                    scanText.textContent = 'Scan Items';
+                    scanButton.classList.remove('scan-pulse');
+                }, 1500);
+            });
+
+            closeModal.addEventListener('click', hideAlert);
+            alertModal.addEventListener('click', (e) => {
+                if (e.target === alertModal) {
+                    hideAlert();
+                }
+            });
+
+            // Initialize the app
+            updateItemsList();
+        })();
+    </script>
+</body>
+</html>
